@@ -4,60 +4,55 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="referrer" content="no-referrer" />
-  <title>Yandex RTB 300x250</title>
+  <title>Yandex RTB</title>
   <style>
-    html,body{margin:0;padding:0;background:transparent;}
-    #wrap{display:block;width:100%;}
+    html,body{margin:0;padding:0;background:transparent}
+    #ya_rtb_root{display:block;margin:0 auto;max-width:100%}
   </style>
-  <!-- Яндекс-контекст грузим ВНУТРИ iframe -->
   <script src="https://yandex.ru/ads/system/context.js" async></script>
 </head>
 <body>
-  <div id="wrap">
-    <div id="yandex_rtb_R-A-14383531-11"></div>
-  </div>
+  <div id="ya_rtb_root"></div>
 
   <script>
-    // Параметры можно прокидывать через URL: ?block=...&w=300&h=250
     (function(){
+      // Параметры из URL: ?block=R-A-...&w=300&h=250
       var qs = new URLSearchParams(location.search);
       var BLOCK_ID = qs.get('block') || 'R-A-14383531-11';
       var W = +(qs.get('w') || 300), H = +(qs.get('h') || 250);
 
-      var root = document.getElementById('yandex_rtb_R-A-14383531-11');
+      var root = document.getElementById('ya_rtb_root');
       root.style.width = W + 'px';
       root.style.height = H + 'px';
-      root.style.maxWidth = '100%';
-      root.style.margin = '0 auto';
 
-      // Безопасно инициализируем очередь колбэков
       window.yaContextCb = window.yaContextCb || [];
       window.yaContextCb.push(function () {
-        Ya.Context.AdvManager.render({
-          blockId: BLOCK_ID,
-          renderTo: 'yandex_rtb_R-A-14383531-11',
-          onRender: function () {
-            // Несколько постов высоты — чтобы родитель подстроил iframe
-            function postSize(){
-              var h = Math.max(
-                document.documentElement.scrollHeight,
-                document.body.scrollHeight,
-                document.documentElement.offsetHeight,
-                document.body.offsetHeight
-              );
-              parent.postMessage({type:'ya-rtb-size', h: h}, '*');
+        try {
+          Ya.Context.AdvManager.render({
+            blockId: BLOCK_ID,
+            renderTo: 'ya_rtb_root',
+            onRender: function () {
+              // Сообщаем родителю высоту (на случай динамики/подгрузки)
+              function postSize(){
+                var h = Math.max(
+                  document.documentElement.scrollHeight,
+                  document.body.scrollHeight,
+                  document.documentElement.offsetHeight,
+                  document.body.offsetHeight
+                );
+                parent.postMessage({type:'ya-rtb-size', h:h}, '*');
+              }
+              postSize();
+              setTimeout(postSize, 300);
+              setTimeout(postSize, 1200);
+              setTimeout(postSize, 3000);
+              try {
+                var mo = new MutationObserver(postSize);
+                mo.observe(document.body, {childList:true, subtree:true});
+              } catch(e) {}
             }
-            postSize();
-            setTimeout(postSize, 300);
-            setTimeout(postSize, 1200);
-            setTimeout(postSize, 3000);
-            // На случай динамики — следим за изменениями
-            try{
-              var mo = new MutationObserver(postSize);
-              mo.observe(document.body, {childList:true, subtree:true});
-            }catch(e){}
-          }
-        });
+          });
+        } catch(e) {}
       });
     })();
   </script>

@@ -1,26 +1,18 @@
 (function(){
-  // === НАСТРОЙКИ ===
-  var BLOCK_ID = 'R-A-14383531-11';      // ваш RTB-блок
-  var WRAP_ID = 'ya-rtb-flex-after-last-p';
-  var AD_PAGE = [
-    // при желании можно добавить резервные источники
-    'https://elynov2025.github.io/ads2/ad2.html',
-    'https://cdn.jsdelivr.net/gh/elynov2025/ads2@main/ad2.html',
-    'https://raw.githubusercontent.com/elynov2025/ads2/main/ad2.html'
-  ];
-  var TIMEOUT_MS = 3500;
+  var BLOCK_ID = 'R-A-14383531-11';
+  var WRAP_ID  = 'ya-rtb-flex-after-last-p-direct';
   var DEBUG = false;
-
   function log(){ if(DEBUG) console.log.apply(console, arguments); }
+
   (function pre(hs){ (hs||[]).forEach(function(h){
     try{
       var a=document.createElement('link'); a.rel='preconnect'; a.href=h;
       var b=document.createElement('link'); b.rel='dns-prefetch'; b.href=h;
       document.head.appendChild(a); document.head.appendChild(b);
     }catch(e){}
-  }); })(['https://elynov2025.github.io','https://cdn.jsdelivr.net','https://raw.githubusercontent.com','https://yandex.ru']);
+  }); })(['https://yandex.ru']);
 
-  // --- Поиск места вставки (последний «абзац») ---
+  // --- Поиск места вставки ---
   function visible(el){
     if(!el) return false;
     if(!(el.offsetWidth||el.offsetHeight||el.getClientRects().length)) return false;
@@ -43,91 +35,68 @@
     return null;
   }
 
-  // --- Контейнер ---
   function buildAnchor(){
     var wrap=document.getElementById(WRAP_ID);
     if(wrap) return wrap;
     wrap=document.createElement('div');
     wrap.id=WRAP_ID;
     wrap.style.cssText='width:100%;display:block;margin:16px 0 0;';
-    var box=document.createElement('div');
-    // без фиксированных размеров
-    box.style.cssText=['width:100%','max-width:100%','margin:12px auto 0','display:block','box-sizing:border-box','overflow:visible'].join(';');
-    wrap.appendChild(box);
+    var contId='ya_rtb_'+Math.random().toString(36).slice(2);
+    var cont=document.createElement('div');
+    cont.id=contId; // уникальный renderTo
+    // никаких width/height — пусть Яндекс сам управляет
+    wrap.appendChild(cont);
+    wrap.setAttribute('data-cont', contId);
     return wrap;
   }
+
   function placeAnchor(){
     var root=contentRoot(), last=lastParagraphLike(root);
-    if(!last){ log('[ya-iframe] last paragraph not found'); return null; }
+    if(!last){ log('[ya-direct] last paragraph not found'); return null; }
     var wrap=buildAnchor(); if(!wrap.parentNode) last.insertAdjacentElement('afterend', wrap);
     return wrap;
   }
 
-  // --- Вставка iframe с резервами и srcdoc-фолбэком ---
-  function buildSrcdoc(){
-    // Встроенная версия на случай недоступности всех источников ad2.html
-    var id='ya_rt_container';
-    var html='<!doctype html><html><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><style>html,body{margin:0;padding:0;background:transparent}#wrap{display:block;width:100%;max-width:100%;margin:0 auto}</style></head><body><div id="wrap"><div id="'+id+'"></div></div><script src="https://yandex.ru/ads/system/context.js"><\\/script><script>window.yaContextCb=window.yaContextCb||[];yaContextCb.push(function(){try{Ya.Context.AdvManager.render({blockId:"'+BLOCK_ID+'",renderTo:"'+id+'",onRender:function(){function p(){var h=Math.max(document.documentElement.scrollHeight,document.body.scrollHeight,document.documentElement.offsetHeight,document.body.offsetHeight);parent.postMessage({type:"ya-rtb-size",h:h},"*")}p();setTimeout(p,300);setTimeout(p,1200);setTimeout(p,3000);try{var mo=new MutationObserver(p);mo.observe(document.body,{childList:true,subtree:true});}catch(e){} }})}catch(e){}});<\\/script></body></html>';
-    return html;
+  function ensureContext(cb){
+    window.yaContextCb = window.yaContextCb || [];
+    if (window.Ya && Ya.Context && Ya.Context.AdvManager) { cb(); return; }
+    var s=document.querySelector('script[src^="https://yandex.ru/ads/system/context.js"]');
+    if(!s){
+      s=document.createElement('script');
+      s.src='https://yandex.ru/ads/system/context.js';
+      s.async=true;
+      s.onload=function(){ cb(); };
+      document.head.appendChild(s);
+    }
+    window.yaContextCb.push(cb);
   }
 
-  function mountIframe(wrap){
-    var box=wrap.firstChild; box.innerHTML='';
-    var iframe=document.createElement('iframe');
-    iframe.style.border='0'; iframe.style.display='block';
-    iframe.style.width='100%'; iframe.style.height='0px'; // высоту задаём по postMessage
-    iframe.loading='lazy';
-    box.appendChild(iframe);
-
-    // авто-ресайз
-    window.addEventListener('message', function(ev){
-      if(ev.source!==iframe.contentWindow) return;
-      var d=ev.data||{};
-      if(d.type==='ya-rtb-size'){
-        var h=+d.h||0; if(h>0 && h<4000){ iframe.style.height=h+'px'; }
-      }
-    });
-
-    // перебор источников
-    var i=-1, timer=null;
-    function next(){
-      i++;
-      if(i<AD_PAGE.length){
-        var u=AD_PAGE[i]+'?block='+encodeURIComponent(BLOCK_ID)+'&renderTo=ya_rt_container';
-        iframe.removeAttribute('srcdoc'); iframe.src=u;
-        log('[ya-iframe] try', u);
-        clearTimeout(timer);
-        timer=setTimeout(function(){ log('[ya-iframe] timeout, switch'); next(); }, TIMEOUT_MS);
-      }else{
-        // srcdoc-фолбэк
-        log('[ya-iframe] using srcdoc fallback');
-        iframe.removeAttribute('src');
-        if('srcdoc' in iframe) iframe.srcdoc=buildSrcdoc();
-        else {
-          var blob=new Blob([buildSrcdoc()],{type:'text/html'});
-          iframe.src=URL.createObjectURL(blob);
-        }
-      }
-    }
-    next();
+  function renderOnce(wrap){
+    var contId = wrap.getAttribute('data-cont');
+    try{
+      Ya.Context.AdvManager.render({
+        blockId: BLOCK_ID,
+        renderTo: contId
+      });
+      log('[ya-direct] rendered →', contId);
+    }catch(e){ log('[ya-direct] render error', e); }
   }
 
   function init(){
     var wrap=placeAnchor(); if(!wrap) return;
+    var run=function(){ ensureContext(function(){ renderOnce(wrap); }); };
     if('IntersectionObserver' in window){
       var io=new IntersectionObserver(function(es){
-        es.forEach(function(e){ if(e.isIntersecting){ io.disconnect(); mountIframe(wrap); } });
+        es.forEach(function(e){ if(e.isIntersecting){ io.disconnect(); run(); } });
       },{root:null,rootMargin:'600px 0px',threshold:0});
       io.observe(wrap);
-    } else {
-      mountIframe(wrap);
-    }
+    } else { run(); }
   }
 
   function ready(fn){ if(document.readyState!=='loading') fn(); else document.addEventListener('DOMContentLoaded', fn); }
   ready(function(){
     init(); setTimeout(init,800); setTimeout(init,2000);
-    // SPA Wix — реагируем на замены контента
+    // SPA Wix — повторная проверка при подменах контента
     var mo=new MutationObserver(function(){ init(); });
     mo.observe(document.body,{childList:true,subtree:true});
   });

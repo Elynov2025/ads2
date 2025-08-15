@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="referrer" content="no-referrer" />
+  <title>aclib banner</title>
+  <style>
+    html,body{margin:0;padding:0;background:transparent}
+    #wrap{display:block;width:100%;max-width:100%;margin:0 auto}
+  </style>
+  <script data-cfasync="false" src="https://acscdn.com/script/atg.js" async></script>
+</head>
+<body>
+  <div id="wrap">
+    <div>
+      <script>
+        (function(w){
+          w.aclib = w.aclib || {};
+          function run(){
+            if (w.aclib && typeof w.aclib.runBanner === 'function') {
+              w.aclib.runBanner({ zoneId: '10287402' });
+            } else {
+              setTimeout(run, 200);
+            }
+          }
+          run();
+        })(window);
+      </script>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      function postSize(){
+        var h = Math.max(
+          document.documentElement.scrollHeight,
+          document.body.scrollHeight,
+          document.documentElement.offsetHeight,
+          document.body.offsetHeight
+        );
+        try { parent.postMessage({type:'aclib-size', h:h}, '*'); } catch(e) {}
+      }
+      postSize();
+      setTimeout(postSize, 300);
+      setTimeout(postSize, 1200);
+      setTimeout(postSize, 3000);
+      try {
+        var mo = new MutationObserver(postSize);
+        mo.observe(document.body, {childList:true, subtree:true});
+      } catch(e) {}
+    })();
+  </script>
+</body>
+</html>

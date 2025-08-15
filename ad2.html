@@ -4,56 +4,60 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="referrer" content="no-referrer" />
-  <title>Yandex RTB</title>
+  <title>Onclicka Ad</title>
   <style>
     html,body{margin:0;padding:0;background:transparent}
-    #ya_rtb_root{display:block;margin:0 auto;max-width:100%}
+    #wrap{display:block;width:100%;max-width:100%;margin:0 auto}
   </style>
-  <script src="https://yandex.ru/ads/system/context.js" async></script>
+  <!-- Сеть Onclicka подключаем внутри iframe -->
+  <script src="https://js.onclckmn.com/static/onclicka.js" async data-admpid="307391"></script>
 </head>
 <body>
-  <div id="ya_rtb_root"></div>
+  <div id="wrap">
+    <!-- Баннер (размер не фиксируем) -->
+    <div data-banner-id="6064015"></div>
+  </div>
 
   <script>
-    (function(){
-      // Параметры из URL: ?block=R-A-...&w=300&h=250
-      var qs = new URLSearchParams(location.search);
-      var BLOCK_ID = qs.get('block') || 'R-A-14383531-11';
-      var W = +(qs.get('w') || 300), H = +(qs.get('h') || 250);
+    (function () {
+      // Опционально: можно передать ?banner=...&admpid=...&maxw=... в URL
+      try {
+        var qs = new URLSearchParams(location.search);
+        var banner = qs.get('banner');      // например: ?banner=6064015
+        var admpid = qs.get('admpid');      // например: ?admpid=307391
+        var maxw   = qs.get('maxw');        // например: ?maxw=680
 
-      var root = document.getElementById('ya_rtb_root');
-      root.style.width = W + 'px';
-      root.style.height = H + 'px';
+        var holder = document.querySelector('[data-banner-id]');
+        if (banner) holder.setAttribute('data-banner-id', banner);
 
-      window.yaContextCb = window.yaContextCb || [];
-      window.yaContextCb.push(function () {
-        try {
-          Ya.Context.AdvManager.render({
-            blockId: BLOCK_ID,
-            renderTo: 'ya_rtb_root',
-            onRender: function () {
-              // Сообщаем родителю высоту (на случай динамики/подгрузки)
-              function postSize(){
-                var h = Math.max(
-                  document.documentElement.scrollHeight,
-                  document.body.scrollHeight,
-                  document.documentElement.offsetHeight,
-                  document.body.offsetHeight
-                );
-                parent.postMessage({type:'ya-rtb-size', h:h}, '*');
-              }
-              postSize();
-              setTimeout(postSize, 300);
-              setTimeout(postSize, 1200);
-              setTimeout(postSize, 3000);
-              try {
-                var mo = new MutationObserver(postSize);
-                mo.observe(document.body, {childList:true, subtree:true});
-              } catch(e) {}
-            }
-          });
-        } catch(e) {}
-      });
+        var sdk = document.querySelector('script[src*="onclicka.js"]');
+        if (admpid) sdk.setAttribute('data-admpid', admpid);
+
+        if (maxw) {
+          var wrap = document.getElementById('wrap');
+          wrap.style.maxWidth = parseInt(maxw,10) + 'px';
+        }
+      } catch(e) {}
+
+      // Сообщаем родителю высоту (для авто-ресайза iframe)
+      function postSize(){
+        var h = Math.max(
+          document.documentElement.scrollHeight,
+          document.body.scrollHeight,
+          document.documentElement.offsetHeight,
+          document.body.offsetHeight
+        );
+        try { parent.postMessage({type:'oc-size', h:h}, '*'); } catch(e) {}
+      }
+      // Первичные замеры + слежение за изменениями
+      postSize();
+      setTimeout(postSize, 400);
+      setTimeout(postSize, 1200);
+      setTimeout(postSize, 3000);
+      try {
+        var mo = new MutationObserver(postSize);
+        mo.observe(document.body, {childList:true, subtree:true});
+      } catch(e) {}
     })();
   </script>
 </body>
